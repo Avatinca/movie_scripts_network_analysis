@@ -1,0 +1,548 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Coraline — Sieć Postaci</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,600;1,300;1,600&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#06070f;--surface:#0b0d1a;--card:#10132a;--card2:#13162e;
+  --border:#1c2045;--border2:#2a3060;
+  --c0:#d44f6e;--c1:#4f9ed4;--c2:#5dbd7e;--c3:#a86fd4;
+  --text:#c0c8e8;--muted:#4a5280;--muted2:#6a72a0;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--text);font-family:'Space Mono',monospace;height:100vh;overflow:hidden;display:flex;flex-direction:column}
+
+/* ── HEADER ── */
+header{display:flex;align-items:center;gap:1.2rem;padding:.6rem 1.2rem;background:var(--surface);border-bottom:1px solid var(--border);flex-shrink:0;position:relative}
+header::after{content:'';position:absolute;bottom:-1px;left:0;right:0;height:1px;background:linear-gradient(90deg,var(--c0),var(--c1) 35%,var(--c2) 65%,var(--c3));opacity:.5}
+.brand h1{font-family:'Cormorant Garamond',serif;font-weight:600;font-style:italic;font-size:1.45rem;letter-spacing:.08em;color:#fff;line-height:1}
+.brand sub{font-size:.55rem;letter-spacing:.18em;text-transform:uppercase;color:var(--muted)}
+.legend{display:flex;gap:.4rem;margin-left:auto;flex-wrap:wrap}
+.lbtn{display:flex;align-items:center;gap:.35rem;padding:.2rem .55rem;border:1px solid currentColor;border-radius:2px;font-size:.55rem;letter-spacing:.1em;text-transform:uppercase;cursor:pointer;transition:all .2s;background:transparent;opacity:.85;font-family:'Space Mono',monospace}
+.lbtn:hover{opacity:1}.lbtn.off{opacity:.2;text-decoration:line-through}
+.lbtn[data-c="0"]{color:var(--c0)}.lbtn[data-c="1"]{color:var(--c1)}.lbtn[data-c="2"]{color:var(--c2)}.lbtn[data-c="3"]{color:var(--c3)}
+.stats{margin-left:.5rem;display:flex;gap:1rem;font-size:.55rem;letter-spacing:.07em;color:var(--muted)}
+.stats span b{color:var(--text)}
+
+/* ── MAIN LAYOUT ── */
+#main{flex:1;display:flex;overflow:hidden}
+
+/* ── SIDE PANEL ── */
+#side{
+  width:260px;flex-shrink:0;
+  background:var(--surface);
+  border-right:1px solid var(--border);
+  display:flex;flex-direction:column;
+  overflow:hidden;
+}
+.side-tabs{display:flex;border-bottom:1px solid var(--border);flex-shrink:0}
+.stab{
+  flex:1;padding:.45rem .3rem;text-align:center;
+  font-size:.55rem;letter-spacing:.12em;text-transform:uppercase;
+  cursor:pointer;color:var(--muted);border-bottom:2px solid transparent;
+  transition:color .2s,border-color .2s;background:transparent;border-top:none;border-left:none;border-right:none;
+  font-family:'Space Mono',monospace;
+}
+.stab.active{color:var(--text);border-bottom-color:var(--c1)}
+.stab-content{display:none;flex:1;overflow-y:auto;flex-direction:column}
+.stab-content.active{display:flex}
+.stab-content::-webkit-scrollbar{width:3px}
+.stab-content::-webkit-scrollbar-track{background:transparent}
+.stab-content::-webkit-scrollbar-thumb{background:var(--border2);border-radius:2px}
+
+/* Metrics panel */
+.metric-sort{display:flex;gap:0;flex-shrink:0;border-bottom:1px solid var(--border);padding:.4rem .7rem;gap:.4rem;align-items:center}
+.metric-sort span{font-size:.52rem;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+.msort-btn{font-size:.52rem;letter-spacing:.08em;padding:.15rem .4rem;background:transparent;border:1px solid var(--border);border-radius:2px;color:var(--muted2);cursor:pointer;transition:all .15s;font-family:'Space Mono',monospace}
+.msort-btn.active{background:var(--card2);border-color:var(--border2);color:var(--text)}
+#metrics-list{flex:1;overflow-y:auto;padding:.3rem 0}
+#metrics-list::-webkit-scrollbar{width:3px}
+#metrics-list::-webkit-scrollbar-track{background:transparent}
+#metrics-list::-webkit-scrollbar-thumb{background:var(--border2)}
+.mrow{
+  display:grid;grid-template-columns:1fr auto;
+  align-items:center;padding:.3rem .7rem;
+  border-left:2px solid transparent;
+  cursor:pointer;transition:background .15s,border-color .15s;
+  gap:.3rem;
+}
+.mrow:hover{background:var(--card)}
+.mrow.selected{border-left-color:currentColor;background:var(--card2)}
+.mrow-name{font-size:.6rem;letter-spacing:.04em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mrow-vals{display:flex;flex-direction:column;align-items:flex-end;gap:.1rem;flex-shrink:0}
+.mrow-main{font-size:.65rem;font-weight:700;letter-spacing:.04em}
+.mrow-sub{font-size:.5rem;color:var(--muted2);letter-spacing:.04em}
+.mrow-bar-wrap{grid-column:1/-1;height:2px;background:var(--border);border-radius:1px;margin-top:.1rem}
+.mrow-bar{height:100%;border-radius:1px;transition:width .4s}
+
+/* Path panel */
+#path-panel{flex:1;overflow-y:auto;display:flex;flex-direction:column;padding:.5rem 0}
+#path-panel::-webkit-scrollbar{width:3px}
+#path-panel::-webkit-scrollbar-track{background:transparent}
+#path-panel::-webkit-scrollbar-thumb{background:var(--border2)}
+.path-empty{flex:1;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:.5rem;padding:1.5rem;text-align:center}
+.path-empty .pe-icon{font-size:1.8rem;opacity:.3}
+.path-empty p{font-size:.58rem;letter-spacing:.08em;color:var(--muted);line-height:1.7}
+.path-header{padding:.4rem .7rem .2rem;flex-shrink:0}
+.path-title{font-family:'Cormorant Garamond',serif;font-style:italic;font-size:1rem;color:#fff;line-height:1.1}
+.path-subtitle{font-size:.52rem;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-top:.1rem}
+
+/* hop levels */
+.hop-group{margin:.35rem 0}
+.hop-label{font-size:.5rem;letter-spacing:.15em;text-transform:uppercase;color:var(--muted);padding:.1rem .7rem;display:flex;align-items:center;gap:.4rem}
+.hop-label::after{content:'';flex:1;height:1px;background:var(--border)}
+.hop-item{
+  display:flex;align-items:center;padding:.25rem .7rem;gap:.5rem;
+  cursor:pointer;transition:background .15s;
+}
+.hop-item:hover{background:var(--card)}
+.hop-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0}
+.hop-name{font-size:.6rem;letter-spacing:.04em;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.hop-weight{font-size:.6rem;font-weight:700;flex-shrink:0}
+.hop-bar-wrap{height:2px;background:var(--border);border-radius:1px;margin:0 .7rem .1rem;flex-shrink:0}
+.hop-bar{height:100%;border-radius:1px}
+
+/* ── CANVAS ── */
+#canvas{flex:1;position:relative;overflow:hidden}
+svg{width:100%;height:100%;cursor:grab}
+svg:active{cursor:grabbing}
+
+/* nodes */
+.node{cursor:pointer}
+.node .ring{fill:none;stroke-width:1.5;opacity:.3;transition:opacity .25s,r .25s}
+.node .lbl{font-family:'Space Mono',monospace;font-size:9.5px;letter-spacing:.04em;pointer-events:none;opacity:0;transition:opacity .2s;paint-order:stroke fill;stroke-width:4px;stroke-linejoin:round;stroke:var(--bg)}
+.node:hover .lbl,.node.pinned .lbl,.node.lit .lbl,.node.selected .lbl{opacity:1}
+.node:hover .ring,.node.lit .ring{opacity:.8}
+.node.selected .ring{opacity:1;stroke-width:2.5}
+.dimmed{opacity:.05;transition:opacity .3s}
+
+/* tooltip */
+#tip{position:absolute;pointer-events:none;opacity:0;transition:opacity .15s;background:var(--card);border:1px solid var(--border2);border-radius:3px;padding:.65rem .9rem;max-width:200px;z-index:20}
+#tip.on{opacity:1}
+#tip .tip-name{font-family:'Cormorant Garamond',serif;font-style:italic;font-size:1rem;color:#fff;margin-bottom:.3rem;line-height:1.1}
+#tip .tip-row{font-size:.6rem;letter-spacing:.07em;color:var(--muted);line-height:1.9}
+#tip .tip-row b{color:var(--text)}
+#tip .tip-hint{font-size:.52rem;color:var(--muted);margin-top:.4rem;letter-spacing:.07em;border-top:1px solid var(--border);padding-top:.35rem}
+
+/* zoom controls */
+#zc{position:absolute;bottom:1rem;right:1rem;display:flex;flex-direction:column;gap:.3rem}
+.zb{width:28px;height:28px;background:var(--card);border:1px solid var(--border);border-radius:2px;color:var(--text);cursor:pointer;font-size:.9rem;display:flex;align-items:center;justify-content:center;transition:border-color .2s;font-family:'Space Mono',monospace}
+.zb:hover{border-color:var(--border2)}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="brand"><h1>Coraline</h1><sub>Sieć postaci · analiza dialogów</sub></div>
+  <div class="legend" id="legend">
+    <button class="lbtn" data-c="0">● Świat Coraline</button>
+    <button class="lbtn" data-c="1">● Inna Matka / duchy</button>
+    <button class="lbtn" data-c="2">● Inny świat</button>
+    <button class="lbtn" data-c="3">● Sąsiedzi / Wybie</button>
+  </div>
+  <div class="stats">
+    <span><b id="sn">44</b> węzłów</span>
+    <span><b id="se">—</b> krawędzi</span>
+  </div>
+</header>
+
+<div id="main">
+
+  <!-- ── SIDE PANEL ── -->
+  <div id="side">
+    <div class="side-tabs">
+      <button class="stab active" data-tab="metrics">Metryki</button>
+      <button class="stab" data-tab="path">Ścieżka relacji</button>
+    </div>
+
+    <!-- METRICS TAB -->
+    <div class="stab-content active" id="tab-metrics">
+      <div class="metric-sort">
+        <span>Sortuj:</span>
+        <button class="msort-btn active" data-sort="tw">Waga</button>
+        <button class="msort-btn" data-sort="deg">Stopień</button>
+        <button class="msort-btn" data-sort="bc">Centralność</button>
+      </div>
+      <div id="metrics-list"></div>
+    </div>
+
+    <!-- PATH TAB -->
+    <div class="stab-content" id="tab-path">
+      <div id="path-panel">
+        <div class="path-empty">
+          <div class="pe-icon">◎</div>
+          <p>Kliknij węzeł na grafie,<br>aby zobaczyć ścieżkę relacji<br>krok po kroku.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── GRAPH CANVAS ── -->
+  <div id="canvas">
+    <svg id="svg"></svg>
+    <div id="tip">
+      <div class="tip-name" id="t-name"></div>
+      <div class="tip-row">Klasa: <b id="t-cls"></b></div>
+      <div class="tip-row">Stopień: <b id="t-deg"></b></div>
+      <div class="tip-row">Waga łączna: <b id="t-w"></b></div>
+      <div class="tip-hint">Kliknij → ścieżka relacji</div>
+    </div>
+    <div id="zc">
+      <button class="zb" id="zi">+</button>
+      <button class="zb" id="zo">−</button>
+      <button class="zb" id="zr">⌂</button>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ─── DATA ── */
+const ND={"CORALINE":{c:0},"MOTHER":{c:1},"OTHER MOTHER":{c:2},"WYBIE":{c:3},"CAT":{c:0},"OTHER FATHER":{c:2},"MEL":{c:3},"OTHER WYBIE":{c:3},"CHARLIE":{c:3},"BELDAM":{c:1},"TALL OTHER MOTHER":{c:1},"MR. BOBINSKY":{c:3},"MISS SPINK":{c:3},"MISS FORCIBLE":{c:3},"OTHER MR. BOBINSKY":{c:3},"WYBIE'S GRANDMOTHER":{c:3},"SWEET GIRL GHOST":{c:1},"BOY GHOST":{c:1},"DRAGONFLIES":{c:2},"TOY SQUID":{c:2},"CONTINUE":{c:2},"TALL GIRL GHOST":{c:1},"PHOTO FRIEND 1":{c:2},"PHOTO FRIEND 2":{c:2},"MAGIC DRAGONFLY":{c:2},"PANICKED":{c:0},"YOUNG SPINK":{c:3},"MATCH MOVE DISSOLVE TO":{c:0},"JUMP CUT TO":{c:0},"OTHER MISS SPINK":{c:3},"YOUNG FORCIBLE":{c:3},"OTHER MISS FORCIBLE":{c:3},"MATCH PULLBACK":{c:2},"PHOTO FRIENDS":{c:2},"TOY TANK GIRAFFE":{c:2},"ENTRANCE TO OTHER ORCHARD":{c:0},"OTHER HOUSE REAPPEARS":{c:0},"OTHER ORCHARD":{c:0},"OTHER STEEP HILLSIDE TRAIL":{c:0},"ALL GHOSTS":{c:1},"WRAPPED BOX":{c:0},"YOUNG RASCAL":{c:1},"TAFFY MONSTER":{c:1},"DON'T LEAVE ME":{c:0}};
+
+const ED=[["CORALINE","OTHER MOTHER",36],["CORALINE","CAT",24],["CORALINE","WYBIE",20],["CORALINE","OTHER FATHER",18],["CORALINE","MOTHER",15],["CORALINE","BELDAM",14],["CORALINE","OTHER WYBIE",11],["CORALINE","MEL",11],["CORALINE","MISS SPINK",7],["CORALINE","MISS FORCIBLE",7],["CORALINE","CHARLIE",7],["CORALINE","MR. BOBINSKY",6],["CORALINE","SWEET GIRL GHOST",5],["CORALINE","BOY GHOST",4],["CORALINE","TALL OTHER MOTHER",3],["CORALINE","OTHER MR. BOBINSKY",3],["CORALINE","TALL GIRL GHOST",3],["CORALINE","ALL GHOSTS",3],["CORALINE","WYBIE'S GRANDMOTHER",3],["CORALINE","YOUNG SPINK",3],["CORALINE","YOUNG FORCIBLE",3],["CORALINE","OTHER MISS SPINK",2],["CORALINE","OTHER MISS FORCIBLE",2],["CORALINE","YOUNG RASCAL",2],["CORALINE","TAFFY MONSTER",2],["CORALINE","PANICKED",1],["CORALINE","DRAGONFLIES",1],["CORALINE","TOY SQUID",1],["CORALINE","CONTINUE",1],["CORALINE","ENTRANCE TO OTHER ORCHARD",1],["CORALINE","OTHER HOUSE REAPPEARS",1],["CORALINE","OTHER ORCHARD",1],["CORALINE","OTHER STEEP HILLSIDE TRAIL",1],["CORALINE","WRAPPED BOX",1],["CORALINE","MAGIC DRAGONFLY",1],["CORALINE","PHOTO FRIEND 1",1],["CORALINE","PHOTO FRIEND 2",1],["CORALINE","PHOTO FRIENDS",1],["CORALINE","TOY TANK GIRAFFE",1],["OTHER MOTHER","OTHER FATHER",24],["OTHER MOTHER","BELDAM",13],["OTHER MOTHER","CAT",9],["OTHER MOTHER","WYBIE",8],["OTHER MOTHER","OTHER WYBIE",7],["OTHER MOTHER","OTHER MR. BOBINSKY",6],["OTHER MOTHER","SWEET GIRL GHOST",5],["OTHER MOTHER","MOTHER",4],["OTHER MOTHER","TALL OTHER MOTHER",3],["OTHER MOTHER","OTHER MISS SPINK",3],["OTHER MOTHER","OTHER MISS FORCIBLE",2],["OTHER MOTHER","MEL",2],["OTHER MOTHER","BOY GHOST",2],["OTHER MOTHER","TALL GIRL GHOST",2],["OTHER MOTHER","ALL GHOSTS",2],["OTHER MOTHER","CHARLIE",2],["OTHER MOTHER","MISS FORCIBLE",1],["OTHER MOTHER","MISS SPINK",1],["OTHER MOTHER","MR. BOBINSKY",1],["OTHER MOTHER","DRAGONFLIES",1],["OTHER MOTHER","TOY SQUID",1],["OTHER MOTHER","CONTINUE",1],["OTHER MOTHER","YOUNG SPINK",1],["OTHER MOTHER","YOUNG FORCIBLE",1],["OTHER MOTHER","TAFFY MONSTER",1],["OTHER MOTHER","YOUNG RASCAL",1],["OTHER MOTHER","PHOTO FRIEND 1",1],["OTHER MOTHER","PHOTO FRIEND 2",1],["OTHER MOTHER","PHOTO FRIENDS",1],["OTHER MOTHER","MAGIC DRAGONFLY",1],["CAT","WYBIE",12],["CAT","OTHER FATHER",7],["CAT","BELDAM",7],["CAT","OTHER WYBIE",5],["CAT","MOTHER",3],["CAT","MEL",3],["CAT","CHARLIE",2],["CAT","OTHER MR. BOBINSKY",2],["CAT","MISS SPINK",2],["CAT","MISS FORCIBLE",2],["CAT","SWEET GIRL GHOST",2],["CAT","TALL OTHER MOTHER",1],["CAT","BOY GHOST",1],["CAT","TALL GIRL GHOST",1],["CAT","ALL GHOSTS",1],["CAT","MR. BOBINSKY",1],["CAT","WYBIE'S GRANDMOTHER",1],["CAT","OTHER MISS SPINK",1],["CAT","OTHER MISS FORCIBLE",1],["CAT","YOUNG SPINK",1],["CAT","YOUNG FORCIBLE",1],["CAT","TAFFY MONSTER",1],["CAT","YOUNG RASCAL",1],["CAT","PHOTO FRIEND 1",1],["CAT","PHOTO FRIEND 2",1],["CAT","MAGIC DRAGONFLY",1],["CAT","DRAGONFLIES",1],["WYBIE","OTHER WYBIE",11],["WYBIE","MOTHER",5],["WYBIE","MEL",4],["WYBIE","CHARLIE",4],["WYBIE","OTHER FATHER",3],["WYBIE","MISS SPINK",2],["WYBIE","MISS FORCIBLE",2],["WYBIE","MR. BOBINSKY",2],["WYBIE","WYBIE'S GRANDMOTHER",2],["WYBIE","BELDAM",1],["WYBIE","SWEET GIRL GHOST",1],["WYBIE","BOY GHOST",1],["WYBIE","TALL GIRL GHOST",1],["WYBIE","ALL GHOSTS",1],["WYBIE","OTHER MR. BOBINSKY",1],["WYBIE","TAFFY MONSTER",1],["WYBIE","YOUNG RASCAL",1],["OTHER FATHER","OTHER WYBIE",3],["OTHER FATHER","OTHER MR. BOBINSKY",3],["OTHER FATHER","BELDAM",3],["OTHER FATHER","SWEET GIRL GHOST",2],["OTHER FATHER","MOTHER",1],["OTHER FATHER","MEL",1],["OTHER FATHER","CHARLIE",1],["OTHER FATHER","MISS SPINK",1],["OTHER FATHER","MISS FORCIBLE",1],["OTHER FATHER","MR. BOBINSKY",1],["OTHER FATHER","TALL OTHER MOTHER",1],["OTHER FATHER","BOY GHOST",1],["OTHER FATHER","TALL GIRL GHOST",1],["OTHER FATHER","ALL GHOSTS",1],["OTHER FATHER","WYBIE'S GRANDMOTHER",1],["OTHER FATHER","YOUNG RASCAL",1],["MOTHER","MEL",4],["MOTHER","CHARLIE",2],["MOTHER","MISS SPINK",2],["MOTHER","MISS FORCIBLE",2],["MOTHER","MR. BOBINSKY",2],["MOTHER","WYBIE'S GRANDMOTHER",2],["MOTHER","BELDAM",1],["MOTHER","OTHER WYBIE",1],["MOTHER","OTHER MR. BOBINSKY",1],["MOTHER","SWEET GIRL GHOST",1],["MOTHER","BOY GHOST",1],["MOTHER","TALL GIRL GHOST",1],["MOTHER","ALL GHOSTS",1],["MOTHER","YOUNG RASCAL",1],["BELDAM","SWEET GIRL GHOST",6],["BELDAM","BOY GHOST",2],["BELDAM","TALL GIRL GHOST",1],["BELDAM","MISS FORCIBLE",1],["BELDAM","MISS SPINK",1],["BELDAM","MR. BOBINSKY",1],["BELDAM","WYBIE'S GRANDMOTHER",1],["BELDAM","ALL GHOSTS",1],["BELDAM","TALL OTHER MOTHER",1],["TALL OTHER MOTHER","ALL GHOSTS",3],["TALL OTHER MOTHER","BOY GHOST",2],["TALL OTHER MOTHER","SWEET GIRL GHOST",1],["TALL OTHER MOTHER","TALL GIRL GHOST",1],["MR. BOBINSKY","OTHER MR. BOBINSKY",4],["MR. BOBINSKY","MISS FORCIBLE",1],["MR. BOBINSKY","MISS SPINK",1],["MR. BOBINSKY","WYBIE'S GRANDMOTHER",1],["MISS SPINK","MISS FORCIBLE",4],["MISS SPINK","OTHER MISS SPINK",2],["MISS SPINK","OTHER MISS FORCIBLE",1],["MISS SPINK","YOUNG FORCIBLE",1],["MISS SPINK","YOUNG SPINK",1],["MISS SPINK","CONTINUE",1],["MISS SPINK","WYBIE'S GRANDMOTHER",1],["MISS FORCIBLE","OTHER MISS SPINK",1],["MISS FORCIBLE","YOUNG FORCIBLE",1],["MISS FORCIBLE","YOUNG SPINK",1],["MISS FORCIBLE","CONTINUE",1],["MISS FORCIBLE","OTHER MISS FORCIBLE",1],["MISS FORCIBLE","WYBIE'S GRANDMOTHER",1],["SWEET GIRL GHOST","TALL GIRL GHOST",1],["SWEET GIRL GHOST","BOY GHOST",2],["SWEET GIRL GHOST","ALL GHOSTS",1],["BOY GHOST","TALL GIRL GHOST",1],["BOY GHOST","ALL GHOSTS",1],["TALL GIRL GHOST","ALL GHOSTS",1],["TALL GIRL GHOST","TAFFY MONSTER",1],["TALL GIRL GHOST","YOUNG SPINK",1],["DRAGONFLIES","TOY SQUID",1],["DRAGONFLIES","PHOTO FRIEND 2",1],["DRAGONFLIES","PHOTO FRIEND 1",1],["DRAGONFLIES","CONTINUE",1],["DRAGONFLIES","MAGIC DRAGONFLY",1],["DRAGONFLIES","MATCH PULLBACK",1],["DRAGONFLIES","PHOTO FRIENDS",1],["DRAGONFLIES","TOY TANK GIRAFFE",1],["TOY SQUID","PHOTO FRIEND 1",1],["TOY SQUID","PHOTO FRIEND 2",1],["TOY SQUID","CONTINUE",1],["TOY SQUID","MAGIC DRAGONFLY",1],["TOY SQUID","MATCH PULLBACK",1],["TOY SQUID","PHOTO FRIENDS",1],["TOY SQUID","TOY TANK GIRAFFE",1],["CONTINUE","MAGIC DRAGONFLY",1],["CONTINUE","MATCH PULLBACK",1],["CONTINUE","PHOTO FRIEND 1",1],["CONTINUE","PHOTO FRIEND 2",1],["CONTINUE","PHOTO FRIENDS",1],["CONTINUE","TOY TANK GIRAFFE",1],["YOUNG SPINK","YOUNG FORCIBLE",1],["YOUNG SPINK","OTHER MISS FORCIBLE",1],["YOUNG SPINK","OTHER MISS SPINK",1],["OTHER MISS SPINK","OTHER MISS FORCIBLE",1],["OTHER MISS SPINK","YOUNG FORCIBLE",1],["YOUNG FORCIBLE","OTHER MISS FORCIBLE",1],["MATCH PULLBACK","PHOTO FRIENDS",1],["MATCH PULLBACK","TOY TANK GIRAFFE",1],["PHOTO FRIENDS","TOY TANK GIRAFFE",1],["ENTRANCE TO OTHER ORCHARD","OTHER HOUSE REAPPEARS",1],["ENTRANCE TO OTHER ORCHARD","OTHER ORCHARD",1],["ENTRANCE TO OTHER ORCHARD","OTHER STEEP HILLSIDE TRAIL",1],["OTHER HOUSE REAPPEARS","OTHER ORCHARD",1],["OTHER HOUSE REAPPEARS","OTHER STEEP HILLSIDE TRAIL",1],["OTHER ORCHARD","OTHER STEEP HILLSIDE TRAIL",1]];
+
+/* ─── PALETTE ── */
+const COL=['#d44f6e','#4f9ed4','#5dbd7e','#a86fd4'];
+const CLSn=['Świat Coraline','Inna Matka / duchy','Inny świat','Sąsiedzi / Wybie'];
+
+/* ─── BUILD GRAPH ── */
+const nodeMap={};
+Object.keys(ND).forEach(id=>{
+  nodeMap[id]={id,cls:ND[id].c,deg:0,tw:0,neighbors:new Map()};
+});
+const links=[];
+ED.forEach(([s,t,w])=>{
+  if(!nodeMap[s]||!nodeMap[t])return;
+  nodeMap[s].deg++;nodeMap[t].deg++;
+  nodeMap[s].tw+=w;nodeMap[t].tw+=w;
+  nodeMap[s].neighbors.set(t,(nodeMap[s].neighbors.get(t)||0)+w);
+  nodeMap[t].neighbors.set(s,(nodeMap[t].neighbors.get(s)||0)+w);
+  links.push({source:s,target:t,weight:w});
+});
+const nodes=Object.values(nodeMap);
+const maxW=d3.max(nodes,d=>d.tw);
+const maxDeg=d3.max(nodes,d=>d.deg);
+const rSc=d3.scaleSqrt().domain([0,maxW]).range([4,26]);
+const wSc=d3.scaleLinear().domain([1,36]).range([0.5,5.5]);
+nodes.forEach(n=>{n.r=rSc(n.tw);});
+document.getElementById('se').textContent=links.length;
+
+/* ─── BETWEENNESS CENTRALITY (approximate) ── */
+// BFS-based betweenness for unweighted graph
+function computeBC(){
+  const bc={};
+  nodes.forEach(n=>bc[n.id]=0);
+  nodes.forEach(src=>{
+    const stack=[];
+    const pred={};nodes.forEach(n=>pred[n.id]=[]);
+    const sigma={};nodes.forEach(n=>sigma[n.id]=0);sigma[src.id]=1;
+    const dist={};nodes.forEach(n=>dist[n.id]=-1);dist[src.id]=0;
+    const queue=[src.id];
+    while(queue.length){
+      const v=queue.shift();stack.push(v);
+      const nbrs=nodeMap[v].neighbors;
+      nbrs.forEach((_,w)=>{
+        if(dist[w]<0){dist[w]=dist[v]+1;queue.push(w);}
+        if(dist[w]===dist[v]+1){sigma[w]+=sigma[v];pred[w].push(v);}
+      });
+    }
+    const delta={};nodes.forEach(n=>delta[n.id]=0);
+    while(stack.length){
+      const w=stack.pop();
+      pred[w].forEach(v=>{delta[v]+=(sigma[v]/sigma[w])*(1+delta[w]);});
+      if(w!==src.id)bc[w]+=delta[w];
+    }
+  });
+  const bcMax=Math.max(...Object.values(bc));
+  nodes.forEach(n=>{n.bc=bc[n.id];n.bcN=bcMax>0?bc[n.id]/bcMax:0;});
+}
+computeBC();
+
+/* ─── METRICS PANEL ── */
+let sortKey='tw';
+let selectedNode=null;
+
+function renderMetrics(){
+  const sorted=[...nodes].sort((a,b)=>b[sortKey]-a[sortKey]);
+  const mxVal=d3.max(sorted,d=>d[sortKey]);
+  const list=document.getElementById('metrics-list');
+  list.innerHTML='';
+  sorted.forEach((n,i)=>{
+    const pct=mxVal>0?Math.round(n[sortKey]/mxVal*100):0;
+    const val=sortKey==='bc'?n[sortKey].toFixed(0):n[sortKey];
+    const sub=sortKey==='tw'?`st:${n.deg}`:(sortKey==='deg'?`w:${n.tw}`:`w:${n.tw}`);
+    const row=document.createElement('div');
+    row.className='mrow'+(selectedNode&&selectedNode.id===n.id?' selected':'');
+    row.style.color=COL[n.cls];
+    row.innerHTML=`
+      <div class="mrow-name" style="color:var(--text)">${i+1}. ${n.id}</div>
+      <div class="mrow-vals">
+        <div class="mrow-main" style="color:${COL[n.cls]}">${val}</div>
+        <div class="mrow-sub">${sub}</div>
+      </div>
+      <div class="mrow-bar-wrap" style="grid-column:1/-1">
+        <div class="mrow-bar" style="width:${pct}%;background:${COL[n.cls]}"></div>
+      </div>`;
+    row.addEventListener('click',()=>selectNode(n));
+    list.appendChild(row);
+  });
+}
+renderMetrics();
+
+document.querySelectorAll('.msort-btn').forEach(b=>{
+  b.addEventListener('click',()=>{
+    sortKey=b.dataset.sort;
+    document.querySelectorAll('.msort-btn').forEach(x=>x.classList.remove('active'));
+    b.classList.add('active');
+    renderMetrics();
+  });
+});
+
+/* ─── PATH (BFS hop layers) ── */
+function buildHops(src){
+  const visited=new Set([src.id]);
+  const layers=[];
+  let current=[src.id];
+  while(current.length&&layers.length<3){ // max 3 hops deep
+    const next=[];
+    const layer=[];
+    current.forEach(id=>{
+      nodeMap[id].neighbors.forEach((w,nb)=>{
+        if(!visited.has(nb)){
+          visited.add(nb);
+          next.push(nb);
+          layer.push({id:nb,via:id,weight:w,cls:nodeMap[nb].cls});
+        }
+      });
+    });
+    // sort by weight desc
+    layer.sort((a,b)=>b.weight-a.weight);
+    if(layer.length) layers.push(layer);
+    current=next;
+  }
+  return layers;
+}
+
+function renderPath(n){
+  const panel=document.getElementById('path-panel');
+  const hops=buildHops(n);
+  const maxHopW=Math.max(...hops.flatMap(l=>l.map(x=>x.weight)),1);
+
+  let html=`<div class="path-header">
+    <div class="path-title" style="color:${COL[n.cls]}">${n.id}</div>
+    <div class="path-subtitle">Ścieżka relacji · ${n.deg} bezpośrednich połączeń</div>
+  </div>`;
+
+  const hopLabels=['Hop 1 — bezpośrednie','Hop 2 — przez pośrednika','Hop 3 — dalsze powiązania'];
+  hops.forEach((layer,hi)=>{
+    html+=`<div class="hop-group"><div class="hop-label">${hopLabels[hi]} (${layer.length})</div>`;
+    layer.forEach(item=>{
+      const pct=Math.round(item.weight/maxHopW*100);
+      const direct=hi===0;
+      html+=`<div class="hop-item" data-id="${item.id}" style="${direct?'':'opacity:.8'}">
+        <div class="hop-dot" style="background:${COL[item.cls]}"></div>
+        <div class="hop-name">${item.id}</div>
+        ${direct?`<div class="hop-weight" style="color:${COL[item.cls]}">${item.weight}</div>`:''}
+      </div>
+      ${direct?`<div class="hop-bar-wrap"><div class="hop-bar" style="width:${pct}%;background:${COL[item.cls]}"></div></div>`:''}`;
+    });
+    html+='</div>';
+  });
+  panel.innerHTML=html;
+
+  // click on hop item → select that node
+  panel.querySelectorAll('.hop-item').forEach(el=>{
+    el.addEventListener('click',()=>{
+      const id=el.dataset.id;
+      if(nodeMap[id]) selectNode(nodeMap[id]);
+    });
+  });
+}
+
+/* ─── SVG SETUP ── */
+const svg=d3.select('#svg');
+const cvs=document.getElementById('canvas');
+const W=cvs.clientWidth;
+const H=cvs.clientHeight;
+
+// Stars
+const stG=svg.append('g');
+for(let i=0;i<150;i++){
+  stG.append('circle').attr('cx',Math.random()*W).attr('cy',Math.random()*H)
+     .attr('r',Math.random()*1.1+.15).attr('fill','#fff').attr('opacity',Math.random()*.4+.05);
+}
+// Bg radial
+const defs=svg.append('defs');
+const rg=defs.append('radialGradient').attr('id','rg').attr('cx','50%').attr('cy','50%').attr('r','50%');
+rg.append('stop').attr('offset','0%').attr('stop-color','#181c3a').attr('stop-opacity',.55);
+rg.append('stop').attr('offset','100%').attr('stop-color','#06070f').attr('stop-opacity',0);
+svg.append('ellipse').attr('cx',W/2).attr('cy',H/2).attr('rx',W*.6).attr('ry',H*.6).attr('fill','url(#rg)');
+
+// Glow filters
+COL.forEach((_,i)=>{
+  const f=defs.append('filter').attr('id',`gf${i}`).attr('x','-80%').attr('y','-80%').attr('width','260%').attr('height','260%');
+  f.append('feGaussianBlur').attr('in','SourceGraphic').attr('stdDeviation','5').attr('result','blur');
+  const m=f.append('feMerge');
+  m.append('feMergeNode').attr('in','blur');
+  m.append('feMergeNode').attr('in','SourceGraphic');
+});
+
+const g=svg.append('g');
+
+/* zoom */
+const zoom=d3.zoom().scaleExtent([.1,8]).on('zoom',e=>g.attr('transform',e.transform));
+svg.call(zoom);
+document.getElementById('zi').onclick=()=>svg.transition().duration(300).call(zoom.scaleBy,1.4);
+document.getElementById('zo').onclick=()=>svg.transition().duration(300).call(zoom.scaleBy,0.7);
+document.getElementById('zr').onclick=()=>svg.transition().duration(400).call(zoom.transform,d3.zoomIdentity);
+
+/* simulation */
+const sim=d3.forceSimulation(nodes)
+  .force('link',d3.forceLink(links).id(d=>d.id).distance(d=>90-Math.min(d.weight*1.8,55)).strength(d=>Math.min(d.weight/25,.85)))
+  .force('charge',d3.forceManyBody().strength(-260).distanceMax(400))
+  .force('center',d3.forceCenter(W/2,H/2))
+  .force('collision',d3.forceCollide().radius(d=>d.r+6))
+  .alphaDecay(.018);
+
+/* edges */
+const link=g.append('g').selectAll('line').data(links).join('line')
+  .attr('stroke','#2a304a').attr('stroke-width',d=>wSc(d.weight)).attr('stroke-linecap','round');
+
+/* nodes */
+const node=g.append('g').selectAll('g').data(nodes).join('g').attr('class','node')
+  .call(d3.drag()
+    .on('start',(e,d)=>{if(!e.active)sim.alphaTarget(.3).restart();d.fx=d.x;d.fy=d.y;})
+    .on('drag',(e,d)=>{d.fx=e.x;d.fy=e.y;})
+    .on('end',(e,d)=>{if(!e.active)sim.alphaTarget(0);if(!d.pinned){d.fx=null;d.fy=null;}}));
+
+// ring
+node.append('circle').attr('class','ring').attr('r',d=>d.r+7).attr('stroke',d=>COL[d.cls]);
+// glow
+node.append('circle').attr('r',d=>d.r).attr('fill',d=>COL[d.cls]).attr('fill-opacity',.15).attr('filter',d=>`url(#gf${d.cls})`);
+// core
+node.append('circle').attr('r',d=>d.r).attr('fill',d=>COL[d.cls]).attr('fill-opacity',d=>d.tw>20?.92:.72).attr('stroke',d=>COL[d.cls]).attr('stroke-width',1).attr('stroke-opacity',.4);
+// inner highlight
+node.filter(d=>d.tw>15).append('circle').attr('r',d=>Math.max(d.r*.28,2)).attr('fill','#fff').attr('fill-opacity',.32).attr('pointer-events','none');
+// label
+node.append('text').attr('class','lbl').attr('x',d=>d.r+5).attr('y',4).attr('fill',d=>COL[d.cls])
+  .text(d=>d.id.length>22?d.id.slice(0,20)+'…':d.id);
+
+/* tooltip */
+const tip=document.getElementById('tip');
+node.on('mouseenter',function(event,d){
+  const nb=d.neighbors;
+  node.classed('dimmed',n=>n.id!==d.id&&!nb.has(n.id));
+  node.classed('lit',n=>n.id===d.id||nb.has(n.id));
+  link.attr('stroke',l=>(l.source.id===d.id||l.target.id===d.id)?COL[d.cls]:'#2a304a')
+      .attr('stroke-opacity',l=>(l.source.id===d.id||l.target.id===d.id)?.85:.1);
+  document.getElementById('t-name').textContent=d.id;
+  document.getElementById('t-cls').textContent=CLSn[d.cls];
+  document.getElementById('t-deg').textContent=d.deg;
+  document.getElementById('t-w').textContent=d.tw;
+  tip.classList.add('on');
+  moveTip(event);
+}).on('mousemove',moveTip).on('mouseleave',function(){
+  if(selectedNode) return; // keep highlight if selected
+  node.classed('dimmed',false).classed('lit',false);
+  link.attr('stroke','#2a304a').attr('stroke-opacity',1);
+  tip.classList.remove('on');
+});
+
+function moveTip(ev){
+  const r=cvs.getBoundingClientRect();
+  let x=ev.clientX-r.left+16,y=ev.clientY-r.top-12;
+  if(x+210>r.width)x-=225;
+  if(y+130>r.height)y-=140;
+  tip.style.left=x+'px';tip.style.top=y+'px';
+}
+
+/* ─── SELECT NODE ── */
+function selectNode(n){
+  selectedNode=n;
+
+  // highlight on graph
+  const nb=n.neighbors;
+  node.classed('dimmed',x=>x.id!==n.id&&!nb.has(x.id));
+  node.classed('lit',x=>x.id===n.id||nb.has(x.id));
+  node.classed('selected',x=>x.id===n.id);
+  link.attr('stroke',l=>(l.source.id===n.id||l.target.id===n.id)?COL[n.cls]:'#2a304a')
+      .attr('stroke-opacity',l=>(l.source.id===n.id||l.target.id===n.id)?.9:.08);
+
+  // switch to path tab
+  switchTab('path');
+
+  // render path
+  renderPath(n);
+
+  // re-render metrics (highlight row)
+  renderMetrics();
+}
+
+// click on graph node
+node.on('click',function(ev,d){
+  ev.stopPropagation();
+  if(selectedNode&&selectedNode.id===d.id){
+    // deselect
+    selectedNode=null;
+    node.classed('dimmed',false).classed('lit',false).classed('selected',false);
+    link.attr('stroke','#2a304a').attr('stroke-opacity',1);
+    renderMetrics();
+    document.getElementById('path-panel').innerHTML=`<div class="path-empty"><div class="pe-icon">◎</div><p>Kliknij węzeł na grafie,<br>aby zobaczyć ścieżkę relacji<br>krok po kroku.</p></div>`;
+    return;
+  }
+  // pin
+  d.pinned=!d.pinned;
+  if(d.pinned){d.fx=d.x;d.fy=d.y;}else{d.fx=null;d.fy=null;}
+  d3.select(this).classed('pinned',d.pinned);
+  sim.alphaTarget(.05).restart();
+  setTimeout(()=>sim.alphaTarget(0),400);
+  selectNode(d);
+});
+
+// click background → deselect
+svg.on('click',()=>{
+  if(!selectedNode)return;
+  selectedNode=null;
+  node.classed('dimmed',false).classed('lit',false).classed('selected',false);
+  link.attr('stroke','#2a304a').attr('stroke-opacity',1);
+  renderMetrics();
+  document.getElementById('path-panel').innerHTML=`<div class="path-empty"><div class="pe-icon">◎</div><p>Kliknij węzeł na grafie,<br>aby zobaczyć ścieżkę relacji<br>krok po kroku.</p></div>`;
+});
+
+/* ─── TABS ── */
+function switchTab(name){
+  document.querySelectorAll('.stab').forEach(t=>t.classList.toggle('active',t.dataset.tab===name));
+  document.querySelectorAll('.stab-content').forEach(t=>t.classList.toggle('active',t.id===`tab-${name}`));
+}
+document.querySelectorAll('.stab').forEach(b=>{
+  b.addEventListener('click',()=>switchTab(b.dataset.tab));
+});
+
+/* ─── LEGEND FILTER ── */
+const active=new Set([0,1,2,3]);
+document.querySelectorAll('.lbtn').forEach(btn=>{
+  btn.addEventListener('click',()=>{
+    const c=+btn.dataset.c;
+    if(active.has(c)){active.delete(c);btn.classList.add('off');}
+    else{active.add(c);btn.classList.remove('off');}
+    node.style('display',d=>active.has(d.cls)?null:'none');
+    link.style('display',l=>{
+      const sc=typeof l.source==='object'?l.source.cls:nodeMap[l.source]?.cls;
+      const tc=typeof l.target==='object'?l.target.cls:nodeMap[l.target]?.cls;
+      return(active.has(sc)&&active.has(tc))?null:'none';
+    });
+  });
+});
+
+/* ─── TICK ── */
+sim.on('tick',()=>{
+  link.attr('x1',d=>d.source.x).attr('y1',d=>d.source.y).attr('x2',d=>d.target.x).attr('y2',d=>d.target.y);
+  node.attr('transform',d=>`translate(${d.x},${d.y})`);
+});
+</script>
+</body>
+</html>
